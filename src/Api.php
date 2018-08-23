@@ -2,7 +2,7 @@
 namespace PedroSantiago\Nfse;
 
 use DOMDocument;
-use Illuminate\Support\Facades\Log; 
+use Illuminate\Support\Facades\Log;
 
 class Api
 {
