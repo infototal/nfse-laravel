@@ -452,7 +452,7 @@ class Api
 		}
 
 		//Gambiarra
-		$trustAllConnection = true; 
+		$trustAllConnection = true;
 
 		curl_setopt($ch,CURLOPT_SSL_VERIFYHOST,$trustAllConnection?0:2);
 		curl_setopt($ch,CURLOPT_SSL_VERIFYPEER,!$trustAllConnection);
