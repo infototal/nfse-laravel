@@ -109,14 +109,14 @@ class Api
 		$pkeyid=openssl_get_privatekey('file://'.str_replace(DIRECTORY_SEPARATOR,'/',$this->privateKey),$this->password);
 		if($pkeyid===false)
 		{
-			Yii::log('Unable to open/parse/decrypt private key file',CLogger::LEVEL_ERROR,'ext.nfse.sign');
+			Log::error('Unable to open/parse/decrypt private key file');
 			return false;
 		}
 		$res=openssl_sign($signedInfo->C14N(),$value,$pkeyid);
 		openssl_free_key($pkeyid);
 		if($res===false)
 		{
-			Yii::log('signing failure',CLogger::LEVEL_ERROR,'ext.nfse.sign');
+			Log::error('signing failure');
 			return false;
 		}
 
@@ -242,13 +242,13 @@ class Api
 			$version=$node->getAttribute('versao');
 			if($version!==$this->version)
 			{
-				Yii::log('Unsupported version: '.$version,CLogger::LEVEL_WARNING,'ext.nfse.verify');
+				Log::warning('Unsupported version: '.$version);
 				return false;
 			}
 		}
 		if(!$node->hasAttribute('Id'))
 		{
-			Yii::log('Element must have an ID',CLogger::LEVEL_WARNING,'ext.nfse.verify');
+			Log::warning('Element must have an ID');
 			return false;
 		}
 		$URI=$node->getAttribute('Id');
@@ -270,7 +270,7 @@ class Api
 			$cert=str_replace(array("\n","\r","\t",' '),'',$cert);
 			if($certificate===$cert) return $signature;
 		}
-		Yii::log('cannot find signature for element: '.$URI,CLogger::LEVEL_WARNING,'ext.nfse.verify');
+		Log::warning('cannot find signature for element: '.$URI);
 		return false;
 	}
 
@@ -540,7 +540,7 @@ class Api
 		}
 		if(is_string($request))
 		{
-			$node->appendChild(new DOMText($request));
+			$node->appendChild(new \DOMText($request));
 			return;
 		}
 		if(is_bool($request))
@@ -573,7 +573,7 @@ class Api
 		for($i=0; $i<$children->length; $i++)
 		{
 			$child=$children->item($i);
-			if($child instanceof DOMText) {
+			if($child instanceof \DOMText) {
 				if($children->length!==1){
 					return false;
 				}
