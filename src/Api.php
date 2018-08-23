@@ -438,9 +438,11 @@ class Api
 		curl_setopt($ch,CURLOPT_RETURNTRANSFER,true);
 		curl_setopt($ch,CURLOPT_VERBOSE,false);
 
-		$url='https://bhissdigital.pbh.gov.br/bhiss-ws/nfse?wsdl';
+		//$url='https://bhissdigital.pbh.gov.br/bhiss-ws/nfse?wsdl';
+		$url='https://feiradesantanaba.webiss.com.br/servicos/wsnfse/nfseServices.svc';
 		if($this->env !== 'production') {
-			$url = str_replace('bhissdigital.pbh.gov.br', 'bhisshomologa.pbh.gov.br', $url);
+			//$url = str_replace('bhissdigital.pbh.gov.br', 'bhisshomologa.pbh.gov.br', $url);
+			$url = str_replace('wsnfse', 'wsnfse_homolog', $url);
 		}
 		curl_setopt($ch,CURLOPT_URL,$url);
 
@@ -450,7 +452,7 @@ class Api
 		}
 
 		//Gambiarra
-		$trustAllConnection = false;
+		$trustAllConnection = true;
 
 		curl_setopt($ch,CURLOPT_SSL_VERIFYHOST,$trustAllConnection?0:2);
 		curl_setopt($ch,CURLOPT_SSL_VERIFYPEER,!$trustAllConnection);
@@ -472,9 +474,10 @@ class Api
 		// ????
 		$certificate = str_replace(array('-----BEGIN CERTIFICATE-----','-----END CERTIFICATE-----',"\n","\r","\t",' '),'',$certificate);
 
-		curl_setopt($ch,CURLOPT_SSLCERT,$this->certificate);
-		curl_setopt($ch,CURLOPT_SSLCERTPASSWD,$this->password);
-		curl_setopt($ch,CURLOPT_SSLKEY,$this->privateKey);
+
+		curl_setopt($ch,CURLOPT_SSLCERT,$this->certificate); // "client.pem"
+		curl_setopt($ch,CURLOPT_SSLCERTPASSWD,$this->password); // "s3cret"
+		curl_setopt($ch,CURLOPT_SSLKEY,$this->privateKey);  // "key.pem"
 
 		//if($nfse->useProxy) curl_setopt($ch,CURLOPT_PROXY,$nfse->proxyHost.':'.$nfse->proxyPort);
 
@@ -504,30 +507,29 @@ class Api
 		$error = curl_error($ch);
 		curl_close($ch);
 
-		/**if($errno!==0)
+		if($errno!==0)
 		{
-			Yii::log('cURL error: ('.$errno.') '.$error.' '.$this->inputXml,CLogger::LEVEL_ERROR,'ext.nfse.call');
+			Log::error('cURL error: ('.$errno.') '.$error.' '.$this->_inputXml);
 			return false;
 		}
 		if($httpcode!==200)
 		{
-			Yii::log('HTTP error: ('.$httpcode.') '.$response.' '.$this->inputXml,CLogger::LEVEL_ERROR,'ext.nfse.call');
+            Log::error('HTTP error: ('.$httpcode.') '.$response.' '.$this->_inputXml);
 			return false;
 		}
 
 		$output=$this->unfold($service,$response);
 		if($output===false)
 		{
-			Yii::log('failure unfolding response '.$this->inputXml,CLogger::LEVEL_ERROR,'ext.nfse.call');
+            Log::error('failure unfolding response '.$this->_inputXml);
 			return false;
 		}
-		$object=$this->processOutput($xmlservice,$output,$tags2verify,$certificate,$nfse->xmlValidation);
+		$object=$this->processOutput($xmlservice,$output,$tags2verify,$certificate, false);
 		if($object===false)
 		{
-			Yii::log('failure processing output '.$this->inputXml.' '.$this->outputXml,CLogger::LEVEL_ERROR,'ext.nfse.call');
+            Log::error('failure processing output '.$this->_inputXml.' '.$this->_outputXml);
 			return false;
 		}
-		 * */
 
 		return $object;
 	}
