@@ -19,7 +19,7 @@ class Api
 
 	private $env;
 
-	const NS = 'http://www.abrasf.org.br/nfse.xsd';
+	const NS = 'http://www.abrasf.org.br/nfse';
 
 	public function __construct(array $nfse)
 	{
@@ -481,7 +481,7 @@ class Api
 
 		//if($nfse->useProxy) curl_setopt($ch,CURLOPT_PROXY,$nfse->proxyHost.':'.$nfse->proxyPort);
 
-		$headers[]='Content-Type: text/xml;charset=utf-8';
+		$headers[]='Content-Type: text/xml;charset=utf-8;SOAPAction: https://feiradesantanaba.webiss.com.br/servicos/wsnfse_homolog/nfseServices.svc/EnviarLoteRps';
 		curl_setopt($ch,CURLOPT_HTTPHEADER,$headers);
 
 		$header= $this->processHeader($validate = true);
@@ -571,7 +571,7 @@ class Api
 
 	protected function decode($node)
 	{
-		$object=new stdClass;
+		$object=new \stdClass;
 		$children=$node->childNodes;
 		for($i=0; $i<$children->length; $i++)
 		{
@@ -630,7 +630,7 @@ class Api
 
 	public function GerarNfse($request)
 	{
-		return $this->call(__FUNCTION__,$request,'',array('InfRps','LoteRps'),array('InfNfse','SubstituicaoNfse','Confirmacao'));
+		return $this->call('EnviarLoteRps',$request,'',array('InfRps','LoteRps'),array('InfNfse','SubstituicaoNfse','Confirmacao'));
 	}
 
 	public function RecepcionarLoteRps($request)
