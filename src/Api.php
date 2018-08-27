@@ -439,7 +439,8 @@ class Api
 		curl_setopt($ch,CURLOPT_VERBOSE,false);
 
 		//$url='https://bhissdigital.pbh.gov.br/bhiss-ws/nfse?wsdl';
-		$url='https://feiradesantanaba.webiss.com.br/servicos/wsnfse/nfseServices.svc';
+
+		$url='https://feiradesantanaba.webiss.com.br/servicos/wsnfse/NfseServices.svc?wsdl';
 		if($this->env !== 'production') {
 			//$url = str_replace('bhissdigital.pbh.gov.br', 'bhisshomologa.pbh.gov.br', $url);
 			$url = str_replace('wsnfse', 'wsnfse_homolog', $url);
@@ -481,7 +482,7 @@ class Api
 
 		//if($nfse->useProxy) curl_setopt($ch,CURLOPT_PROXY,$nfse->proxyHost.':'.$nfse->proxyPort);
 
-		$headers[]='Content-Type: text/xml;charset=utf-8;SOAPAction: https://feiradesantanaba.webiss.com.br/servicos/wsnfse_homolog/nfseServices.svc/EnviarLoteRps';
+		$headers[]='Content-Type: text/xml;charset=utf-8;SOAPAction: http://tempuri.org/INfseServices/RecepcionarLoteRps';
 		curl_setopt($ch,CURLOPT_HTTPHEADER,$headers);
 
 		$header= $this->processHeader($validate = true);
