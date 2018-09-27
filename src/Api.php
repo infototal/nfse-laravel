@@ -43,7 +43,8 @@ class Api
 
 	protected function validate(DOMDocument $xml)
 	{
-		return $xml->schemaValidate(dirname(__FILE__).'/../schemas/nfse.xsd');
+	    return true;
+		//return $xml->schemaValidate(dirname(__FILE__).'/../schemas/nfse.xsd');
 
 		//If something goes wrong, throws an exception.
 		/*$errors = libxml_get_errors();
@@ -55,9 +56,9 @@ class Api
 	protected function sign(DOMDocument $xml, $node, $id, $prefix='NfseAssPrestador_')
 	{
 		// hack
-		if($node->tagName=='LoteRps'){
-			$node->setAttribute('versao',$this->version);
-		}
+	//	if($node->tagName=='LoteRps'){
+	//		$node->setAttribute('versao',$this->version);
+	//	}
 
 		if($node->hasAttribute('Id'))
 			$URI=$node->getAttribute('Id');
@@ -69,7 +70,7 @@ class Api
 		$NS='http://www.w3.org/2000/09/xmldsig#';
 
 		$signature=$xml->createElementNS($NS,'Signature');
-		$signature->setAttribute('Id',$prefix.$URI);
+		//$signature->setAttribute('Id',$prefix.$URI);
 		$node->parentNode->appendChild($signature);
 
 		$signedInfo=$xml->createElementNS($NS,'SignedInfo');
@@ -321,11 +322,11 @@ class Api
 	{
 		$xml = new DOMDocument('1.0','UTF-8');
 
-		$cabecalho = $xml->createElementNS(self::NS,'cabecalho');
+		$cabecalho = $xml->createElement('cabecalho');
 		$cabecalho->setAttribute('versao',$this->version);
 		$xml->appendChild($cabecalho);
 
-		$versaoDados=$xml->createElementNS(self::NS,'versaoDados',$this->version);
+		$versaoDados=$xml->createElementNS(self::NS, 'versaoDados', $this->version);
 		$cabecalho->appendChild($versaoDados);
 		if($validate) {
 			if(!$this->validate($xml)) {
@@ -333,7 +334,9 @@ class Api
 			}
 		}
 
-		return $xml->saveXML();
+		$xmlString = $xml->saveXML();
+
+		return str_replace('<?xml version="1.0" encoding="UTF-8"?>', '', $xmlString);
 	}
 
 	protected function processInput($xmlservice,$object,$tags2sign,$validate=true)
@@ -358,26 +361,34 @@ class Api
 		}
 
 		$this->_inputXml = $xml->saveXML();
-		return $this->_inputXml;
+        //return $this->_inputXml;
+		return str_replace('<?xml version="1.0" encoding="UTF-8"?>', '', $this->_inputXml);
 	}
 
 	protected function fold($service, $header, $input)
 	{
 		$xml = new DOMDocument('1.0','UTF-8');
 
-		$envelope=$xml->createElementNS('http://schemas.xmlsoap.org/soap/envelope/','S:Envelope');
+		$envelope = $xml->createElementNS('http://schemas.xmlsoap.org/soap/envelope/','soapenv:Envelope');
+        $envelope->setAttributeNS('http://www.w3.org/2000/xmlns/' ,'xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance');
+        $envelope->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:xsd', 'http://www.w3.org/2001/XMLSchema');
 		$xml->appendChild($envelope);
 
-		$body=$xml->createElement('S:Body');
+		$body=$xml->createElement('soapenv:Body');
 		$envelope->appendChild($body);
 
-		$ns2=$xml->createElementNS('http://ws.bhiss.pbh.gov.br','ns2:'.$service.'Request');
+		//$ns2=$xml->createElementNS('http://ws.bhiss.pbh.gov.br','ns1:'.$service.'Request');
+
+        $ns2=$xml->createElementNS('http://tempuri.org/','RecepcionarLoteRps');
+        //$ns2=$xml->createElementNS('http://ws.bhiss.pbh.gov.br','RecepcionarLoteRps');
 		$body->appendChild($ns2);
 
-		$nfseCabecMsg=$xml->createElement('nfseCabecMsg',$header);
+        $header = '';
+		$nfseCabecMsg=$xml->createElement('cabec',$header);
+
 		$ns2->appendChild($nfseCabecMsg);
 
-		$nfseDadosMsg=$xml->createElement('nfseDadosMsg',$input);
+		$nfseDadosMsg=$xml->createElement('msg',$input);
 		$ns2->appendChild($nfseDadosMsg);
 
 		return $xml->saveXML();
@@ -385,33 +396,55 @@ class Api
 
 	protected function unfold($service,$response)
 	{
-		$xmlresponse = @DOMDocument::loadXML($response);
-		if($xmlresponse===false) return false;
+        $response = str_replace('<?xml version="1.0" encoding="utf-8"?>', '', $response);
+        $xmlresponse = @DOMDocument::loadXML($response, LIBXML_NOBLANKS);
+
+		if($xmlresponse===false){
+            return false;
+        }
 		$envelope=$xmlresponse->documentElement;
-		if($envelope->tagName!=='S:Envelope') return false;
-		if($envelope->namespaceURI!=='http://schemas.xmlsoap.org/soap/envelope/') return false;
-		if($envelope->childNodes->length!==1) return false;
+		if($envelope->tagName!=='s:Envelope'){
+            return false;
+        }
+		if($envelope->namespaceURI!=='http://schemas.xmlsoap.org/soap/envelope/'){
+            return false;
+        }
+		if($envelope->childNodes->length!==1){
+            return false;
+        }
 		$body=$envelope->childNodes->item(0);
-		if($body->tagName!=='S:Body') return false;
-		if($body->childNodes->length!==1) return false;
+		if($body->tagName!=='s:Body'){
+            return false;
+        }
+		if($body->childNodes->length!==1){
+            return false;
+        }
 		$ns2=$body->childNodes->item(0);
-		if($ns2->tagName!=='ns2:'.$service.'Response') return false;
-		if($ns2->namespaceURI!=='http://ws.bhiss.pbh.gov.br') return false;
-		if($ns2->childNodes->length!==1) return false;
+		if($ns2->tagName!=='RecepcionarLoteRpsResponse'){
+            return false;
+        }
+		if($ns2->namespaceURI!=='http://tempuri.org/'){
+            return false;
+        }
+		if($ns2->childNodes->length!==1){
+            return false;
+        }
 		$outputXML=$ns2->childNodes->item(0);
-		if($outputXML->tagName!=='outputXML') return false;
-		if($outputXML->childNodes->length!==1) return false;
+		if($outputXML->tagName!=='RecepcionarLoteRpsResult'){
+            return false;
+        }
+
 		return $outputXML->nodeValue;
 	}
 
 	protected function processOutput($xmlservice,$output,$tags2verify,$certificate,$validate=true)
 	{
-		$xml= @DOMDocument::loadXML($output);
+	    $xml = @DOMDocument::loadXML($output);
 		if($xml===false) {
+		    Log::info(1);
 			return false;
 		}
-		// $result=$this->signAll($xml,$NS,$tags2verify);
-		// if($result===false) return false;
+
 		$this->_outputXml=$xml->saveXML();
 		if($validate) {
 			if(!$this->validate($xml)) {
@@ -420,13 +453,39 @@ class Api
 		}
 		$result=$this->verifyAll($xml,self::NS,$tags2verify,$certificate);
 		if($result===false) {
+
 			return false;
 		}
 		$resposta=$xml->documentElement;
-		if($resposta->tagName !== $xmlservice.'Resposta') return false;
-		if($resposta->namespaceURI !== self::NS) return false;
-		return $this->decode($resposta);
+		if($resposta->tagName !== $xmlservice.'Resposta'){
+            return false;
+        }
+		if($resposta->namespaceURI !== self::NS){
+            return false;
+        }
+
+        $output = $this->removerAcentos($output);
+        return simplexml_load_string($output);
 	}
+
+
+    function value_in($element_name, $xml, $content_only = true) {
+        if ($xml == false) {
+            return false;
+        }
+        $found = preg_match('#<'.$element_name.'(?:\s+[^>]+)?>(.*?)'.
+            '</'.$element_name.'>#s', $xml, $matches);
+        if ($found != false) {
+            if ($content_only) {
+                return $matches[1];  //ignore the enclosing tags
+            } else {
+                return $matches[0];  //return the full pattern match
+            }
+        }
+        // No match found: return false.
+        return false;
+    }
+
 
 	protected function call($service,$object,$xmlservice='',$tags2sign=array(),$tags2verify=array())
 	{
@@ -482,9 +541,6 @@ class Api
 
 		//if($nfse->useProxy) curl_setopt($ch,CURLOPT_PROXY,$nfse->proxyHost.':'.$nfse->proxyPort);
 
-		$headers[]='Content-Type: text/xml;charset=utf-8;SOAPAction: http://tempuri.org/INfseServices/RecepcionarLoteRps';
-		curl_setopt($ch,CURLOPT_HTTPHEADER,$headers);
-
 		$header= $this->processHeader($validate = true);
 		if($header===false) {
 			return false;
@@ -500,6 +556,15 @@ class Api
 			return false;
 		}
 
+        $headers = array(
+            "Content-type: text/xml;charset=\"utf-8\"",
+            "Cache-Control: no-cache",
+            "Pragma: no-cache",
+            "SOAPAction: \"http://tempuri.org/INfseServices/RecepcionarLoteRps\"",
+            "Content-length: ".strlen($request),
+        );
+
+        curl_setopt($ch,CURLOPT_HTTPHEADER,$headers);
 		curl_setopt($ch,CURLOPT_POSTFIELDS,$request);
 
 		$response = curl_exec($ch);
@@ -508,6 +573,8 @@ class Api
 		$error = curl_error($ch);
 		curl_close($ch);
 
+		Log::info($this->_inputXml);
+
 		if($errno!==0)
 		{
 			Log::error('cURL error: ('.$errno.') '.$error.' '.$this->_inputXml);
@@ -515,11 +582,11 @@ class Api
 		}
 		if($httpcode!==200)
 		{
-            Log::error('HTTP error: ('.$httpcode.') '.$response.' '.$this->_inputXml);
+            Log::error('HTTP error: ('.$httpcode.') '.$error.' '.$response.' '.$this->_inputXml);
 			return false;
 		}
 
-		$output=$this->unfold($service,$response);
+		$output=$this->unfold($service, $response);
 		if($output===false)
 		{
             Log::error('failure unfolding response '.$this->_inputXml);
@@ -574,6 +641,7 @@ class Api
 	{
 		$object=new \stdClass;
 		$children=$node->childNodes;
+
 		for($i=0; $i<$children->length; $i++)
 		{
 			$child=$children->item($i);
@@ -598,6 +666,11 @@ class Api
 
 		return $this->decode($xml->documentElement);
 	}
+
+    private function removerAcentos($string)
+    {
+        return preg_replace(array("/(á|à|ã|â|ä)/","/(Á|À|Ã|Â|Ä)/","/(é|è|ê|ë)/","/(É|È|Ê|Ë)/","/(í|ì|î|ï)/","/(Í|Ì|Î|Ï)/","/(ó|ò|õ|ô|ö)/","/(Ó|Ò|Õ|Ô|Ö)/","/(ú|ù|û|ü)/","/(Ú|Ù|Û|Ü)/","/(ñ)/","/(Ñ)/","/(ç)/","/(Ç)/"), explode(" ","a A e E i I o O u U n N c C"), $string);
+    }
 
 	public function CancelarNfse($request)
 	{
