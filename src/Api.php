@@ -55,16 +55,11 @@ class Api
 
 	protected function sign(DOMDocument $xml, $node, $id, $prefix='NfseAssPrestador_')
 	{
-		// hack
-	//	if($node->tagName=='LoteRps'){
-	//		$node->setAttribute('versao',$this->version);
-	//	}
-
 		if($node->hasAttribute('Id'))
 			$URI=$node->getAttribute('Id');
 		else {
 			$URI=$this->cnpj.$this->inscricaoMunicipal.date('YmdHi').sprintf('%02d',$id);
-			$node->setAttribute('Id',$URI);
+			$node->setAttribute('Id',$prefix.$URI);
 		}
 
 		$NS='http://www.w3.org/2000/09/xmldsig#';
@@ -85,19 +80,19 @@ class Api
 		$signedInfo->appendChild($signatureMethod);
 
 		$reference=$xml->createElementNS($NS,'Reference');
-		$reference->setAttribute('URI','#'.$URI);
+		$reference->setAttribute('URI','#'.$prefix.$URI);
 		$signedInfo->appendChild($reference);
 
 		$transforms=$xml->createElementNS($NS,'Transforms');
 		$reference->appendChild($transforms);
 
 		$transform=$xml->createElementNS($NS,'Transform');
-		$transform->setAttribute('Algorithm','http://www.w3.org/TR/2001/REC-xml-c14n-20010315');
-		$transforms->appendChild($transform);
-
-		$transform=$xml->createElementNS($NS,'Transform');
 		$transform->setAttribute('Algorithm','http://www.w3.org/2000/09/xmldsig#enveloped-signature');
 		$transforms->appendChild($transform);
+
+        $transform=$xml->createElementNS($NS,'Transform');
+        $transform->setAttribute('Algorithm','http://www.w3.org/TR/2001/REC-xml-c14n-20010315');
+        $transforms->appendChild($transform);
 
 		$digestMethod=$xml->createElementNS($NS,'DigestMethod');
 		$digestMethod->setAttribute('Algorithm','http://www.w3.org/2000/09/xmldsig#sha1');
@@ -279,7 +274,7 @@ class Api
 	protected function signAll($xml,$NS,$tags2sign)
 	{
 		$signcount=0;
-		foreach($tags2sign as $tag2sign)
+		foreach($tags2sign as $key=>$tag2sign)
 		{
 			$nodes=$xml->getElementsByTagNameNS($NS,$tag2sign);
 			for($i=0; $i<$nodes->length; $i++)
@@ -320,8 +315,7 @@ class Api
 
 	protected function processHeader($validate=true)
 	{
-		$xml = new DOMDocument('1.0','UTF-8');
-
+		/*$xml = new DOMDocument('1.0','UTF-8');
 		$cabecalho = $xml->createElement('cabecalho');
 		$cabecalho->setAttribute('versao',$this->version);
 		$xml->appendChild($cabecalho);
@@ -335,8 +329,9 @@ class Api
 		}
 
 		$xmlString = $xml->saveXML();
+		return str_replace('<?xml version="1.0" encoding="UTF-8"?>', '', $xmlString); */
 
-		return str_replace('<?xml version="1.0" encoding="UTF-8"?>', '', $xmlString);
+        return '';
 	}
 
 	protected function processInput($xmlservice,$object,$tags2sign,$validate=true)
@@ -361,7 +356,6 @@ class Api
 		}
 
 		$this->_inputXml = $xml->saveXML();
-        //return $this->_inputXml;
 		return str_replace('<?xml version="1.0" encoding="UTF-8"?>', '', $this->_inputXml);
 	}
 
@@ -377,13 +371,9 @@ class Api
 		$body=$xml->createElement('soapenv:Body');
 		$envelope->appendChild($body);
 
-		//$ns2=$xml->createElementNS('http://ws.bhiss.pbh.gov.br','ns1:'.$service.'Request');
-
-        $ns2=$xml->createElementNS('http://tempuri.org/','RecepcionarLoteRps');
-        //$ns2=$xml->createElementNS('http://ws.bhiss.pbh.gov.br','RecepcionarLoteRps');
+        $ns2=$xml->createElementNS('http://tempuri.org/', $service);
 		$body->appendChild($ns2);
 
-        $header = '';
 		$nfseCabecMsg=$xml->createElement('cabec',$header);
 
 		$ns2->appendChild($nfseCabecMsg);
@@ -394,7 +384,7 @@ class Api
 		return $xml->saveXML();
 	}
 
-	protected function unfold($service,$response)
+	protected function unfold($service, $response)
 	{
         $response = str_replace('<?xml version="1.0" encoding="utf-8"?>', '', $response);
         $xmlresponse = @DOMDocument::loadXML($response, LIBXML_NOBLANKS);
@@ -420,7 +410,7 @@ class Api
             return false;
         }
 		$ns2=$body->childNodes->item(0);
-		if($ns2->tagName!=='RecepcionarLoteRpsResponse'){
+		if($ns2->tagName!==$service.'Response'){
             return false;
         }
 		if($ns2->namespaceURI!=='http://tempuri.org/'){
@@ -430,7 +420,7 @@ class Api
             return false;
         }
 		$outputXML=$ns2->childNodes->item(0);
-		if($outputXML->tagName!=='RecepcionarLoteRpsResult'){
+		if($outputXML->tagName!==$service.'Result'){
             return false;
         }
 
@@ -441,7 +431,6 @@ class Api
 	{
 	    $xml = @DOMDocument::loadXML($output);
 		if($xml===false) {
-		    Log::info(1);
 			return false;
 		}
 
@@ -453,7 +442,6 @@ class Api
 		}
 		$result=$this->verifyAll($xml,self::NS,$tags2verify,$certificate);
 		if($result===false) {
-
 			return false;
 		}
 		$resposta=$xml->documentElement;
@@ -497,11 +485,8 @@ class Api
 		curl_setopt($ch,CURLOPT_RETURNTRANSFER,true);
 		curl_setopt($ch,CURLOPT_VERBOSE,false);
 
-		//$url='https://bhissdigital.pbh.gov.br/bhiss-ws/nfse?wsdl';
-
 		$url='https://feiradesantanaba.webiss.com.br/servicos/wsnfse/NfseServices.svc?wsdl';
 		if($this->env !== 'production') {
-			//$url = str_replace('bhissdigital.pbh.gov.br', 'bhisshomologa.pbh.gov.br', $url);
 			$url = str_replace('wsnfse', 'wsnfse_homolog', $url);
 		}
 		curl_setopt($ch,CURLOPT_URL,$url);
@@ -534,7 +519,6 @@ class Api
 		// ????
 		$certificate = str_replace(array('-----BEGIN CERTIFICATE-----','-----END CERTIFICATE-----',"\n","\r","\t",' '),'',$certificate);
 
-
 		curl_setopt($ch,CURLOPT_SSLCERT,$this->certificate); // "client.pem"
 		curl_setopt($ch,CURLOPT_SSLCERTPASSWD,$this->password); // "s3cret"
 		curl_setopt($ch,CURLOPT_SSLKEY,$this->privateKey);  // "key.pem"
@@ -560,7 +544,7 @@ class Api
             "Content-type: text/xml;charset=\"utf-8\"",
             "Cache-Control: no-cache",
             "Pragma: no-cache",
-            "SOAPAction: \"http://tempuri.org/INfseServices/RecepcionarLoteRps\"",
+            "SOAPAction: \"http://tempuri.org/INfseServices/$service\"",
             "Content-length: ".strlen($request),
         );
 
@@ -572,8 +556,6 @@ class Api
 		$errno = curl_errno($ch);
 		$error = curl_error($ch);
 		curl_close($ch);
-
-		Log::info($this->_inputXml);
 
 		if($errno!==0)
 		{
@@ -702,13 +684,13 @@ class Api
 		return $this->call(__FUNCTION__,$request);
 	}
 
-	public function GerarNfse($request)
-	{
-		return $this->call('EnviarLoteRps',$request,'',array('InfRps','LoteRps'),array('InfNfse','SubstituicaoNfse','Confirmacao'));
-	}
+    public function GerarNfse($request)
+    {
+        return $this->call(__FUNCTION__,$request,'',array('InfRps','LoteRps'),array('InfNfse','SubstituicaoNfse','Confirmacao'));
+    }
 
 	public function RecepcionarLoteRps($request)
 	{
-		return $this->call(__FUNCTION__,$request,'EnviarLoteRps',array('InfRps','LoteRps'));
+		return $this->call(__FUNCTION__,$request,'EnviarLoteRps',array('InfRps', 'LoteRps'));
 	}
 }
