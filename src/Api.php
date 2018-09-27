@@ -202,7 +202,7 @@ class Api
 		$URI = substr($URI,1);
 
 		if($node === null) {
-			$xpath= new DOMXPath($xml);
+			$xpath= new \DOMXPath($xml);
 			$nodes=$xpath->query("//*[@Id='$URI']");
 
 			if($nodes->length !== 1) {
@@ -232,45 +232,6 @@ class Api
 		return true;
 	}
 
-	protected function findSignature($xml,$node,$certificate)
-	{
-		if($node->hasAttribute('versao'))
-		{
-			$version=$node->getAttribute('versao');
-			if($version!==$this->version)
-			{
-				Log::warning('Unsupported version: '.$version);
-				return false;
-			}
-		}
-		if(!$node->hasAttribute('Id'))
-		{
-			Log::warning('Element must have an ID');
-			return false;
-		}
-		$URI=$node->getAttribute('Id');
-		$xpath=new DOMXPath($xml);
-    		$targets=$xpath->query("//*[@URI='#$URI']");
-		for($i=0; $i<$targets->length; $i++)
-		{
-			$reference=$targets->item($i);
-			$prefix=$reference->lookupPrefix($reference->namespaceURI);
-			$prefix=$prefix===null?'':$prefix.':';
-			if($reference->tagName!==$prefix.'Reference') continue;
-			$signedInfo=$reference->parentNode;
-			if($signedInfo===null || $signedInfo->tagName!==$prefix.'SignedInfo') continue;
-			$signature=$signedInfo->parentNode;
-			if($signature===null || $signature->tagName!==$prefix.'Signature') continue;
-			$list=$signature->getElementsByTagName('X509Certificate');
-			if($list->length!==1) continue;
-			$cert=$list->item(0)->nodeValue;
-			$cert=str_replace(array("\n","\r","\t",' '),'',$cert);
-			if($certificate===$cert) return $signature;
-		}
-		Log::warning('cannot find signature for element: '.$URI);
-		return false;
-	}
-
 	protected function signAll($xml,$NS,$tags2sign)
 	{
 		$signcount=0;
@@ -282,32 +243,6 @@ class Api
 				$node=$nodes->item($i);
 				$result=$this->sign($xml,$node,++$signcount);
 				if($result===false) return false;
-			}
-		}
-		return true;
-	}
-
-	protected function verifyAll($xml,$NS,$tags2verify,$certificate,$cleanup=true)
-	{
-		foreach($tags2verify as $tag2verify)
-		{
-			$nodes=$xml->getElementsByTagNameNS($NS,$tag2verify);
-			for($i=0; $i<$nodes->length; $i++)
-			{
-				$node=$nodes->item($i);
-				$signature=$this->findSignature($xml,$node,$certificate);
-				if($signature===false) return false;
-				$result=$this->verify($xml,$signature,$node);
-				if($result===false) return false;
-			}
-		}
-		if($cleanup)
-		{
-			$nodes=$xml->getElementsByTagNameNS('http://www.w3.org/2000/09/xmldsig#','Signature');
-			while($nodes->length>0)
-			{
-				$node=$nodes->item(0);
-				$node->parentNode->removeChild($node);
 			}
 		}
 		return true;
@@ -427,7 +362,7 @@ class Api
 		return $outputXML->nodeValue;
 	}
 
-	protected function processOutput($xmlservice,$output,$tags2verify,$certificate,$validate=true)
+	protected function processOutput($xmlservice,$output,$validate=true)
 	{
 	    $xml = @DOMDocument::loadXML($output);
 		if($xml===false) {
@@ -440,10 +375,6 @@ class Api
 				throw new \Exception('Output validation failure: '.$xml->saveXML());
 			}
 		}
-		$result=$this->verifyAll($xml,self::NS,$tags2verify,$certificate);
-		if($result===false) {
-			return false;
-		}
 		$resposta=$xml->documentElement;
 		if($resposta->tagName !== $xmlservice.'Resposta'){
             return false;
@@ -453,7 +384,9 @@ class Api
         }
 
         $output = $this->removerAcentos($output);
-        return simplexml_load_string($output);
+        $simpleXml = simplexml_load_string($output);
+        $xmlJson = json_encode($simpleXml);
+        return json_decode($xmlJson);
 	}
 
 
@@ -475,7 +408,7 @@ class Api
     }
 
 
-	protected function call($service,$object,$xmlservice='',$tags2sign=array(),$tags2verify=array())
+	protected function call($service,$object,$xmlservice='',$tags2sign=array())
 	{
 		if(empty($xmlservice)) $xmlservice=$service;
 
@@ -504,20 +437,6 @@ class Api
 		if(!$trustAllConnection){
 			curl_setopt($ch,CURLOPT_CAINFO,dirname(__FILE__).'/../certs/'.$chain);
 		}
-
-		$cert='bhissdigital.pbh.gov.br.X509.cer';
-		if($this->env !== 'production'){
-			$cert=str_replace('bhissdigital.pbh.gov.br','bhisshomologa.pbh.gov.br',$cert);
-		}
-
-		$certificate=file_get_contents(dirname(__FILE__).'/../certs/'.$cert);
-		if($certificate===false) {
-			throw new \Exception('Unable to open certificate file.');
-			return false;
-		}
-
-		// ????
-		$certificate = str_replace(array('-----BEGIN CERTIFICATE-----','-----END CERTIFICATE-----',"\n","\r","\t",' '),'',$certificate);
 
 		curl_setopt($ch,CURLOPT_SSLCERT,$this->certificate); // "client.pem"
 		curl_setopt($ch,CURLOPT_SSLCERTPASSWD,$this->password); // "s3cret"
@@ -574,7 +493,7 @@ class Api
             Log::error('failure unfolding response '.$this->_inputXml);
 			return false;
 		}
-		$object=$this->processOutput($xmlservice,$output,$tags2verify,$certificate, false);
+		$object=$this->processOutput($xmlservice,$output, false);
 		if($object===false)
 		{
             Log::error('failure processing output '.$this->_inputXml.' '.$this->_outputXml);
@@ -656,27 +575,27 @@ class Api
 
 	public function CancelarNfse($request)
 	{
-		return $this->call(__FUNCTION__,$request,'',array('InfPedidoCancelamento'),array('Confirmacao'));
+		return $this->call(__FUNCTION__,$request,'',array('InfPedidoCancelamento'));
 	}
 
 	public function ConsultarLoteRps($request)
 	{
-		return $this->call(__FUNCTION__,$request,'',array(),array('InfNfse','SubstituicaoNfse','Confirmacao'));
+		return $this->call(__FUNCTION__,$request,'',array());
 	}
 
 	public function ConsultarNfse($request)
 	{
-		return $this->call(__FUNCTION__,$request,'',array(),array('InfNfse','SubstituicaoNfse','Confirmacao'));
+		return $this->call(__FUNCTION__,$request,'',array());
 	}
 
 	public function ConsultarNfsePorFaixa($request)
 	{
-		return $this->call(__FUNCTION__,$request,'ConsultarNfseFaixa',array(),array('InfNfse','SubstituicaoNfse','Confirmacao'));
+		return $this->call(__FUNCTION__,$request,'ConsultarNfseFaixa',array());
 	}
 
 	public function ConsultarNfsePorRps($request)
 	{
-		return $this->call(__FUNCTION__,$request,'ConsultarNfseRps',array(),array('InfNfse','SubstituicaoNfse','Confirmacao'));
+		return $this->call(__FUNCTION__,$request,'ConsultarNfseRps',array());
 	}
 
 	public function ConsultarSituacaoLoteRps($request)
@@ -686,7 +605,7 @@ class Api
 
     public function GerarNfse($request)
     {
-        return $this->call(__FUNCTION__,$request,'',array('InfRps','LoteRps'),array('InfNfse','SubstituicaoNfse','Confirmacao'));
+        return $this->call(__FUNCTION__,$request,'',array('InfRps','LoteRps'));
     }
 
 	public function RecepcionarLoteRps($request)
